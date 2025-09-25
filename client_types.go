@@ -29,8 +29,6 @@ var defaultClient = http.Client{
 
 type Logger func(context.Context, string, ...any)
 
-// =============================================================================
-
 type Client struct {
 	log       Logger
 	apiKey    string
@@ -38,7 +36,6 @@ type Client struct {
 	http      *http.Client
 }
 
-// =============================================================================
 func generateBasicHeader(apiKey, apiSecret string) string {
 	s := fmt.Sprintf("%s:%s", apiKey, apiSecret)
 	s = base64.StdEncoding.EncodeToString([]byte(s))

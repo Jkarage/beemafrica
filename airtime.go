@@ -1,8 +1,7 @@
 package beemafrica
 
 import (
-	"bytes"
-	"encoding/json"
+	"context"
 	"net/http"
 	"path"
 )
@@ -12,11 +11,24 @@ const (
 	topupBaseURL   = "https://apitopup.beem.africa"
 )
 
+type AirtimeBallance struct {
+	Data struct {
+		CreditBalance float64 `json:"credit_bal"`
+	} `json:"data"`
+}
+
+type AirtimeTransfer struct {
+	Code          int    `json:"code"`
+	TransactionId int    `json:"transaction_id"`
+	Message       string `json:"message"`
+}
+
 // Transfer attempts to transfer amount from your account to another account.
-// address is the phone number in format 2557135070XX,followed by the amount
+// address is the phone number in format 255712345678,followed by the amount
 // reference is a random number for reference
-func (c *Client) Transfer(address string, amount, reference int) (*http.Response, error) {
+func (c *Client) Transfer(ctx context.Context, address string, amount, reference int) (AirtimeTransfer, error) {
 	var tansferURL = path.Join(airtimeBaseURL, version, "transfer")
+	var resp AirtimeTransfer
 
 	body := map[string]any{
 		"dest_addr":    address,
@@ -24,48 +36,20 @@ func (c *Client) Transfer(address string, amount, reference int) (*http.Response
 		"reference_id": reference,
 	}
 
-	bb, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, tansferURL, bytes.NewBuffer(bb))
-	if err != nil {
-		return nil, err
-	}
-
-	authHeader := generateBasicHeader(c.apiKey, c.apiSecret)
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", authHeader)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
+	if err := c.Do(ctx, http.MethodGet, tansferURL, body, resp); err != nil {
+		return AirtimeTransfer{}, err
 	}
 
 	return resp, nil
 }
 
 // GetBallance retrieves the ballance in your beemafrica account.
-func (c *Client) GetBallance() (*http.Response, error) {
+func (c *Client) GetBallance(ctx context.Context) (AirtimeBallance, error) {
 	var topupURL = path.Join(airtimeBaseURL, version, "credit-ballance?app_name=AIRTIME")
+	var resp AirtimeBallance
 
-	authHeader := generateBasicHeader(c.apiKey, c.apiSecret)
-
-	req, err := http.NewRequest(http.MethodGet, topupURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Authorization", authHeader)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
+	if err := c.Do(ctx, http.MethodGet, topupURL, nil, resp); err != nil {
+		return AirtimeBallance{}, err
 	}
 
 	return resp, nil

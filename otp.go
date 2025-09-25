@@ -1,42 +1,41 @@
 package beemafrica
 
 import (
-	"bytes"
-	"encoding/json"
+	"context"
 	"net/http"
 	"path"
 )
 
 const otpBaseURL = "https://apiotp.beem.africa"
 
-// Request generates a random OTP and sends it to the provided phone number,application id.
-// Requires Mobile number in valid international number format with country code.
-// No leading + sign. Example 255712345678. appid is found in beem dashboard.
-func (o *Client) Request(number string, appId int) (*http.Response, error) {
+// OTPResponse represents the common structure for OTP API responses
+type OTP struct {
+	Data Data `json:"data"`
+}
+type Data struct {
+	Message *Message `json:"message,omitempty"`
+	PinID   string   `json:"pinId,omitempty"`
+	Status  string   `json:"status,omitempty"`
+}
+
+// ResponseMessage represents the message object with code and description
+type Message struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
+// Request generates a random OTP and sends it to the provided phone number.
+// Requires mobile number in valid international format (no leading +), e.g., "255712345678"
+func (c *Client) Request(ctx context.Context, number string, appId int) (*OTP, error) {
 	var requestURL = path.Join(otpBaseURL, version, "request")
+	var resp = &OTP{}
 
 	body := map[string]any{
 		"appId":  appId,
 		"msisdn": number,
 	}
 
-	bb, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	req, err := http.NewRequest(http.MethodPost, requestURL, bytes.NewBuffer(bb))
-	if err != nil {
-		return nil, err
-	}
-
-	authHeader := generateBasicHeader(o.apiKey, o.apiSecret)
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", authHeader)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
+	if err := c.Do(ctx, http.MethodPost, requestURL, body, resp); err != nil {
 		return nil, err
 	}
 
@@ -45,34 +44,18 @@ func (o *Client) Request(number string, appId int) (*http.Response, error) {
 
 // Verify checks to see if the provided OTP matches the pinId provided.
 // Returns a Valid 200 OK Response, In Both cases. Look into data for Valid or Invalid OTP
-func (o *Client) Verify(pinId string, otp string) (*http.Response, error) {
+func (c *Client) Verify(ctx context.Context, pinId string, otp string) (*OTP, error) {
 	var verifyURL = path.Join(otpBaseURL, version, "request")
+	var resp = &OTP{}
 
 	body := map[string]any{
 		"pinId": pinId,
 		"pin":   otp,
 	}
 
-	bb, err := json.Marshal(body)
-	if err != nil {
+	if err := c.Do(ctx, http.MethodPost, verifyURL, body, resp); err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, verifyURL, bytes.NewBuffer(bb))
-	if err != nil {
-		return nil, err
-	}
-
-	authHeader := generateBasicHeader(o.apiKey, o.apiSecret)
-
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Authorization", authHeader)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	return resp, err
+	return resp, nil
 }
