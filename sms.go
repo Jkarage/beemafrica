@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"path"
 )
 
@@ -80,10 +81,12 @@ type SenderNameInput struct {
 // time format is  GMT+0 timezone,(yyyy-mm-dd hh:mm).
 // send now scheduled_time is ""
 func (c *Client) SendSMS(ctx context.Context, message string, recipients []string, schedule_time, senderID string) (*SMSResponse, error) {
-	var (
-		resp       *SMSResponse
-		sendSMSURL = path.Join(smsBaseURL, version, "send")
-	)
+	var resp = &SMSResponse{}
+
+	sendSMSURL, err := url.JoinPath(smsBaseURL, version, "send")
+	if err != nil {
+		return nil, err
+	}
 
 	body := SMSInput{
 		SenderID:     senderID,
@@ -100,7 +103,7 @@ func (c *Client) SendSMS(ctx context.Context, message string, recipients []strin
 		})
 	}
 
-	if err := c.Do(ctx, http.MethodGet, sendSMSURL, body, resp); err != nil {
+	if err := c.Do(ctx, http.MethodPost, sendSMSURL, &body, resp); err != nil {
 		return nil, err
 	}
 
@@ -108,15 +111,17 @@ func (c *Client) SendSMS(ctx context.Context, message string, recipients []strin
 }
 
 // GetBallance request for the sms ballance for a particular account
-// If the error is nil, the response of type *http.Response will be returned
-func (c *Client) GetSMSBallance(ctx context.Context) (SMSBalance, error) {
-	var (
-		resp        SMSBalance
-		ballanceURL = path.Join(smsBaseURL, "public", version, "vendors", "ballance")
-	)
+// If the error is nil, the response of type *SMSBalance will be returned
+func (c *Client) GetSMSBallance(ctx context.Context) (*SMSBalance, error) {
+	var resp = &SMSBalance{}
+
+	ballanceURL, err := url.JoinPath(smsBaseURL, "public", version, "vendors", "balance")
+	if err != nil {
+		return nil, err
+	}
 
 	if err := c.Do(ctx, http.MethodGet, ballanceURL, nil, resp); err != nil {
-		return SMSBalance{}, err
+		return nil, err
 	}
 
 	return resp, nil
@@ -124,8 +129,8 @@ func (c *Client) GetSMSBallance(ctx context.Context) (SMSBalance, error) {
 
 // RequestSenderID queues a request to beem for a specific senderid.
 // Response will be obtained, later through mail.
-func (c *Client) RequestSenderID(ctx context.Context, id, idContent string) (SenderName, error) {
-	var resp SenderName
+func (c *Client) RequestSenderID(ctx context.Context, id, idContent string) (*SenderName, error) {
+	var resp = &SenderName{}
 	var senderURL = path.Join(smsBaseURL, "public", version, "sender-names")
 
 	body := map[string]string{
@@ -134,19 +139,19 @@ func (c *Client) RequestSenderID(ctx context.Context, id, idContent string) (Sen
 	}
 
 	if err := c.Do(ctx, http.MethodPost, senderURL, body, resp); err != nil {
-		return SenderName{}, err
+		return nil, err
 	}
 
 	return resp, nil
 }
 
 // GetSenderNames retrieves sendernames available in your account.
-func (c *Client) GetSenderNames(ctx context.Context) (SenderNames, error) {
+func (c *Client) GetSenderNames(ctx context.Context) (*SenderNames, error) {
 	var senderURL = path.Join(smsBaseURL, "public", version, "sender-names")
-	var resp SenderNames
+	var resp = &SenderNames{}
 
 	if err := c.Do(ctx, http.MethodGet, senderURL, nil, resp); err != nil {
-		return SenderNames{}, err
+		return nil, err
 	}
 
 	return resp, nil

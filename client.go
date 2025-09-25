@@ -90,7 +90,7 @@ func do(ctx context.Context, cln *Client, method string, endpoint string, body a
 	req.Header.Set("Cache-Control", "no-cache")
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", token))
+	req.Header.Set("Authorization", token)
 
 	resp, err := cln.http.Do(req)
 	if err != nil {
@@ -110,10 +110,6 @@ func do(ctx context.Context, cln *Client, method string, endpoint string, body a
 			return nil, fmt.Errorf("readall: error: %w", err)
 		}
 
-		if err := json.Unmarshal(data, &err); err != nil {
-			return nil, fmt.Errorf("decoding: response: %s, error: %w ", string(data), err)
-		}
-
-		return nil, fmt.Errorf("error: response: %s", err)
+		return nil, fmt.Errorf("error: response: %s", data)
 	}
 }

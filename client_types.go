@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -37,8 +38,11 @@ type Client struct {
 }
 
 func generateBasicHeader(apiKey, apiSecret string) string {
-	s := fmt.Sprintf("%s:%s", apiKey, apiSecret)
-	s = base64.StdEncoding.EncodeToString([]byte(s))
+	apiKey = strings.TrimSpace(apiKey)
+	apiSecret = strings.TrimSpace(apiSecret)
 
-	return fmt.Sprintf("Basic %s", s)
+	credentials := fmt.Sprintf("%s:%s", apiKey, apiSecret)
+	encoded := base64.StdEncoding.EncodeToString([]byte(credentials))
+
+	return fmt.Sprintf("Basic %s", encoded)
 }
