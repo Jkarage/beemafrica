@@ -3,37 +3,19 @@ package beemafrica
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"net/http"
+	"path"
 )
 
-type OTPClient struct {
-	apiKey    string
-	secretKey string
-	baseUrl   string
-	verifyUrl string
-}
-
-func NewOTP() *OTPClient {
-	a, b := populate()
-	return &OTPClient{
-		apiKey:    a,
-		secretKey: b,
-		baseUrl:   "https://apiotp.beem.africa/v1/request",
-		verifyUrl: "https://apiotp.beem.africa/v1/verify",
-	}
-}
+const otpBaseURL = "https://apiotp.beem.africa"
 
 // Request generates a random OTP and sends it to the provided phone number,application id.
 // Requires Mobile number in valid international number format with country code.
-// No leading + sign. Example 255713507067. appid is found in beem dashboard.
-func (o *OTPClient) Request(number string, appId int) (*http.Response, error) {
-	// checks for empty Apikey and secretkeys
-	if o.apiKey == "" || o.secretKey == "" {
-		return nil, fmt.Errorf("failed to load accounts apikey or secretkey")
-	}
+// No leading + sign. Example 255712345678. appid is found in beem dashboard.
+func (o *Client) Request(number string, appId int) (*http.Response, error) {
+	var requestURL = path.Join(otpBaseURL, version, "request")
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"appId":  appId,
 		"msisdn": number,
 	}
@@ -42,12 +24,12 @@ func (o *OTPClient) Request(number string, appId int) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest(http.MethodPost, o.baseUrl, bytes.NewBuffer(bb))
+	req, err := http.NewRequest(http.MethodPost, requestURL, bytes.NewBuffer(bb))
 	if err != nil {
 		return nil, err
 	}
 
-	authHeader := generateHeader(o.apiKey, o.secretKey)
+	authHeader := generateBasicHeader(o.apiKey, o.apiSecret)
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", authHeader)
@@ -63,13 +45,10 @@ func (o *OTPClient) Request(number string, appId int) (*http.Response, error) {
 
 // Verify checks to see if the provided OTP matches the pinId provided.
 // Returns a Valid 200 OK Response, In Both cases. Look into data for Valid or Invalid OTP
-func (o *OTPClient) Verify(pinId string, otp string) (*http.Response, error) {
-	// checks for empty Apikey and secretkeys
-	if o.apiKey == "" || o.secretKey == "" {
-		return nil, fmt.Errorf("failed to load accounts apikey or secretkey")
-	}
+func (o *Client) Verify(pinId string, otp string) (*http.Response, error) {
+	var verifyURL = path.Join(otpBaseURL, version, "request")
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"pinId": pinId,
 		"pin":   otp,
 	}
@@ -79,12 +58,13 @@ func (o *OTPClient) Verify(pinId string, otp string) (*http.Response, error) {
 		return nil, err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, o.verifyUrl, bytes.NewBuffer(bb))
+	req, err := http.NewRequest(http.MethodPost, verifyURL, bytes.NewBuffer(bb))
 	if err != nil {
 		return nil, err
 	}
 
-	authHeader := generateHeader(o.apiKey, o.secretKey)
+	authHeader := generateBasicHeader(o.apiKey, o.apiSecret)
+
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Authorization", authHeader)
 

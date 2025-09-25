@@ -3,56 +3,32 @@ package beemafrica
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"net/http"
+	"path"
 )
 
-type SMSClient struct {
-	apiKey      string
-	secretKey   string
-	baseUrl     string
-	ballanceUrl string
-	senderUrl   string
-}
+var ErrInvalidCreds = errors.New("failed to load accounts apikey or secretkey")
 
-func NewSMS() *SMSClient {
-	a, b := populate()
-
-	return &SMSClient{
-		apiKey:      a,
-		secretKey:   b,
-		baseUrl:     "https://apisms.beem.africa/v1/send",
-		ballanceUrl: "https://apisms.beem.africa/public/v1/vendors/balance",
-		senderUrl:   "https://apisms.beem.africa/public/v1/sender-names",
-	}
-}
-
-// func generateHeader(a, b string) string {
-// 	s := fmt.Sprintf("%s:%s", a, b)
-// 	s = base64.StdEncoding.EncodeToString([]byte(s))
-
-// 	return fmt.Sprintf("Basic %s", s)
-// }
+const smsBaseURL = "https://apisms.beem.africa"
 
 // SendSMS sends request to beemafrica to send a message, with given details.
 // the message, a slice of recipients, and a scheduled time value.
 // time format is  GMT+0 timezone,(yyyy-mm-dd hh:mm).
 // send now scheduled_time is ""
-func (s *SMSClient) SendSMS(message string, recipients []string, schedule_time string) (*http.Response, error) {
-	var resp *http.Response
-
-	if s.apiKey == "" || s.secretKey == "" {
-		return nil, fmt.Errorf("failed to load accounts apikey or secretkey")
-	}
+func (c *Client) SendSMS(message string, recipients []string, schedule_time, senderID string) (*http.Response, error) {
+	var (
+		resp       *http.Response
+		sendSMSURL = path.Join(smsBaseURL, version, "send")
+	)
 
 	for i, r := range recipients {
-		// Define the request body
 		body := map[string]interface{}{
-			"source_addr":   "INFO",
+			"source_addr":   senderID,
 			"schedule_time": schedule_time,
 			"encoding":      "0",
 			"message":       message,
-			"recipients": []map[string]interface{}{
+			"recipients": []map[string]any{
 				{
 					"recipient_id": i + 1,
 					"dest_addr":    r,
@@ -65,12 +41,14 @@ func (s *SMSClient) SendSMS(message string, recipients []string, schedule_time s
 		if err != nil {
 			return nil, err
 		}
+
 		// Create a new request
-		req, err := http.NewRequest(http.MethodPost, s.baseUrl, bytes.NewBuffer(jsonBody))
+		req, err := http.NewRequest(http.MethodPost, sendSMSURL, bytes.NewBuffer(jsonBody))
 		if err != nil {
 			return nil, err
 		}
-		authHeader := generateHeader(s.apiKey, s.secretKey)
+
+		authHeader := generateBasicHeader(c.apiKey, c.apiSecret)
 
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", authHeader)
@@ -87,20 +65,19 @@ func (s *SMSClient) SendSMS(message string, recipients []string, schedule_time s
 
 // GetBallance request for the sms ballance for a particular account
 // If the error is nil, the response of type *http.Response will be returned
-func (s *SMSClient) GetBallance() (*http.Response, error) {
-	var resp *http.Response
-
-	if s.apiKey == "" || s.secretKey == "" {
-		return nil, fmt.Errorf("failed to load accounts apikey or secretkey")
-	}
+func (c *Client) GetSMSBallance() (*http.Response, error) {
+	var (
+		resp        *http.Response
+		ballanceURL = path.Join(smsBaseURL, "public", version, "vendors", "ballance")
+	)
 
 	// Create a new request
-	req, err := http.NewRequest(http.MethodGet, s.ballanceUrl, nil)
+	req, err := http.NewRequest(http.MethodGet, ballanceURL, nil)
 	if err != nil {
 		return resp, err
 	}
 
-	authHeader := generateHeader(s.apiKey, s.secretKey)
+	authHeader := generateBasicHeader(c.apiKey, c.apiSecret)
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", authHeader)
@@ -116,27 +93,25 @@ func (s *SMSClient) GetBallance() (*http.Response, error) {
 
 // RequestSenderID queues a request to beem for a specific senderid.
 // Response will be obtained, later through mail.
-func (s *SMSClient) RequestSenderID(id, idContent string) (*http.Response, error) {
-	if s.apiKey == "" || s.secretKey == "" {
-		return nil, fmt.Errorf("failed to load accounts apikey or secretkey")
-	}
+func (c *Client) RequestSenderID(id, idContent string) (*http.Response, error) {
+	var senderURL = path.Join(smsBaseURL, "public", version, "sender-names")
 
 	body := map[string]string{
 		"senderid":       id,
 		"sample_content": idContent,
 	}
 
-	bb, err := json.Marshal(body)
+	mb, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, s.senderUrl, bytes.NewBuffer(bb))
+	req, err := http.NewRequest(http.MethodPost, senderURL, bytes.NewBuffer(mb))
 	if err != nil {
 		return nil, err
 	}
 
-	authHeader := generateHeader(s.apiKey, s.secretKey)
+	authHeader := generateBasicHeader(c.apiKey, c.apiSecret)
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Authorization", authHeader)
 
@@ -151,13 +126,12 @@ func (s *SMSClient) RequestSenderID(id, idContent string) (*http.Response, error
 }
 
 // GetSenderNames retrieves sendernames available in your account.
-func (s *SMSClient) GetSenderNames() (*http.Response, error) {
-	if s.apiKey == "" || s.secretKey == "" {
-		return nil, fmt.Errorf("failed to load accounts apikey or secretkey")
-	}
-	authHeader := generateHeader(s.apiKey, s.secretKey)
+func (c *Client) GetSenderNames() (*http.Response, error) {
+	var senderURL = path.Join(smsBaseURL, "public", version, "sender-names")
 
-	req, err := http.NewRequest(http.MethodGet, s.senderUrl, nil)
+	authHeader := generateBasicHeader(c.apiKey, c.apiSecret)
+
+	req, err := http.NewRequest(http.MethodGet, senderURL, nil)
 	if err != nil {
 		return nil, err
 	}

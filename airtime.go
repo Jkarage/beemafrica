@@ -3,37 +3,22 @@ package beemafrica
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"net/http"
+	"path"
 )
 
-type AirtimeClient struct {
-	apiKey      string
-	secretKey   string
-	baseUrl     string
-	ballanceUrl string
-}
-
-func NewAirtime() *AirtimeClient {
-	a, b := populate()
-	return &AirtimeClient{
-		apiKey:      a,
-		secretKey:   b,
-		baseUrl:     "https://apiairtime.beem.africa/v1/transfer",
-		ballanceUrl: "https://apitopup.beem.africa/v1/credit-balance?app_name=AIRTIME",
-	}
-}
+const (
+	airtimeBaseURL = "https://apiairtime.beem.africa"
+	topupBaseURL   = "https://apitopup.beem.africa"
+)
 
 // Transfer attempts to transfer amount from your account to another account.
 // address is the phone number in format 2557135070XX,followed by the amount
 // reference is a random number for reference
-func (a *AirtimeClient) Transfer(address string, amount, reference int) (*http.Response, error) {
-	// checks for empty Apikey and secretkeys
-	if a.apiKey == "" || a.secretKey == "" {
-		return nil, fmt.Errorf("failed to load accounts apikey or secretkey")
-	}
+func (c *Client) Transfer(address string, amount, reference int) (*http.Response, error) {
+	var tansferURL = path.Join(airtimeBaseURL, version, "transfer")
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"dest_addr":    address,
 		"amount":       amount,
 		"reference_id": reference,
@@ -44,11 +29,12 @@ func (a *AirtimeClient) Transfer(address string, amount, reference int) (*http.R
 		return nil, err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, a.baseUrl, bytes.NewBuffer(bb))
+	req, err := http.NewRequest(http.MethodPost, tansferURL, bytes.NewBuffer(bb))
 	if err != nil {
 		return nil, err
 	}
-	authHeader := generateHeader(a.apiKey, a.secretKey)
+
+	authHeader := generateBasicHeader(c.apiKey, c.apiSecret)
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", authHeader)
@@ -63,14 +49,12 @@ func (a *AirtimeClient) Transfer(address string, amount, reference int) (*http.R
 }
 
 // GetBallance retrieves the ballance in your beemafrica account.
-func (a *AirtimeClient) GetBallance() (*http.Response, error) {
-	// checks for empty Apikey and secretkeys
-	if a.apiKey == "" || a.secretKey == "" {
-		return nil, fmt.Errorf("failed to load accounts apikey or secretkey")
-	}
-	authHeader := generateHeader(a.apiKey, a.secretKey)
+func (c *Client) GetBallance() (*http.Response, error) {
+	var topupURL = path.Join(airtimeBaseURL, version, "credit-ballance?app_name=AIRTIME")
 
-	req, err := http.NewRequest(http.MethodGet, a.ballanceUrl, nil)
+	authHeader := generateBasicHeader(c.apiKey, c.apiSecret)
+
+	req, err := http.NewRequest(http.MethodGet, topupURL, nil)
 	if err != nil {
 		return nil, err
 	}
